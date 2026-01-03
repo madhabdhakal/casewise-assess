@@ -29,7 +29,7 @@ Production-grade backend microservice for Australian migration professionals (Re
 
 - **Runtime**: Node.js 18+ with TypeScript
 - **Web Framework**: Fastify
-- **Database**: PostgreSQL with migrations
+- **Database**: SQL Server (via `mssql`) with migrations
 - **Queue**: BullMQ with Redis
 - **PDF Generation**: Playwright (Chromium)
 - **Testing**: Jest
@@ -40,7 +40,7 @@ Production-grade backend microservice for Australian migration professionals (Re
 ### Prerequisites
 
 - Node.js 18+
-- PostgreSQL 12+
+- SQL Server 2019+
 - Redis 6+
 
 ### Installation
@@ -60,8 +60,8 @@ cp .env.example .env
 
 3. **Set up database**:
 ```bash
-# Create database
-createdb casewise_assess
+# Ensure SQL Server is running and reachable
+export DB_CONNECTION_STRING="Server=localhost,1433;Database=casewise-assess;User Id=...;Password=...;TrustServerCertificate=True;Encrypt=False"
 
 # Run migrations
 npm run build

@@ -9,7 +9,7 @@ export class EligibilityEngine {
     
     // Evaluate each criterion in the ruleset
     for (const criterion of ruleset.rules_json.criteria) {
-      const evaluatorFn = RuleEvaluators[criterion.evaluate];
+      const evaluatorFn = RuleEvaluators[criterion.evaluate] as (profile: ApplicantProfile, params: any) => boolean;
       if (!evaluatorFn) {
         throw new Error(`Unknown evaluator: ${criterion.evaluate}`);
       }
