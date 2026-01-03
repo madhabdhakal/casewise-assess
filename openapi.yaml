@@ -1,0 +1,445 @@
+openapi: 3.0.3
+info:
+  title: CaseWise Assess API
+  description: Production-grade backend microservice for Australian migration professionals
+  version: 1.0.0
+  contact:
+    name: CaseWise Assess Support
+servers:
+  - url: http://localhost:3000
+    description: Development server
+security:
+  - ApiKeyAuth: []
+paths:
+  /health:
+    get:
+      tags:
+        - Health
+      summary: Health check
+      security: []
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: healthy
+                  timestamp:
+                    type: string
+                    format: date-time
+  /v1/assessments:
+    post:
+      tags:
+        - Assessments
+      summary: Create new assessment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - profile_data
+                - policy_snapshot_id
+              properties:
+                profile_data:
+                  $ref: '#/components/schemas/ApplicantProfile'
+                policy_snapshot_id:
+                  type: string
+                  example: au-2026-01-01
+      responses:
+        '201':
+          description: Assessment created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  assessment_id:
+                    type: string
+                    format: uuid
+                  status:
+                    type: string
+                    enum: [pending]
+                  created_at:
+                    type: string
+                    format: date-time
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /v1/assessments/{id}:
+    get:
+      tags:
+        - Assessments
+      summary: Get assessment details
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Assessment details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Assessment'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /v1/assessments/{id}/report.html:
+    get:
+      tags:
+        - Reports
+      summary: Get HTML report
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: HTML report
+          content:
+            text/html:
+              schema:
+                type: string
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /v1/assessments/{id}/report.pdf:
+    get:
+      tags:
+        - Reports
+      summary: Get PDF report
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: PDF report
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /v1/assessments/{id}/signoff:
+    post:
+      tags:
+        - Assessments
+      summary: Add RMA signoff
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - reviewer_name
+                - mara_number
+              properties:
+                reviewer_name:
+                  type: string
+                  example: John Smith
+                mara_number:
+                  type: string
+                  pattern: '^[0-9]{7}$'
+                  example: '1234567'
+                comments:
+                  type: string
+                  example: Assessment reviewed and approved
+      responses:
+        '201':
+          description: Signoff added successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+        '400':
+          $ref: '#/components/responses/ValidationError'
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+  schemas:
+    ApplicantProfile:
+      type: object
+      required:
+        - person
+        - location
+        - visa_history
+        - occupation
+        - english
+        - education
+        - employment
+        - points_claim
+        - state_nomination
+        - documents
+      properties:
+        person:
+          type: object
+          properties:
+            date_of_birth:
+              type: string
+              format: date
+            nationality:
+              type: string
+              minLength: 3
+              maxLength: 3
+            marital_status:
+              type: string
+              enum: [single, married, de_facto, divorced, widowed]
+        location:
+          type: object
+          properties:
+            current_country:
+              type: string
+            current_state:
+              type: string
+            regional_postcode:
+              type: string
+        visa_history:
+          type: object
+          properties:
+            current_visa_subclass:
+              type: string
+            visa_expiry_date:
+              type: string
+              format: date
+            previous_refusals:
+              type: boolean
+            previous_cancellations:
+              type: boolean
+            compliance_issues:
+              type: boolean
+            notes:
+              type: string
+        occupation:
+          type: object
+          properties:
+            anzsco_code:
+              type: string
+              pattern: '^[0-9]{6}$'
+            occupation_title:
+              type: string
+            skills_assessment:
+              type: object
+              properties:
+                status:
+                  type: string
+                  enum: [positive, pending, not_held, expired]
+                assessing_authority:
+                  type: string
+                issue_date:
+                  type: string
+                  format: date
+                expiry_date:
+                  type: string
+                  format: date
+                notes:
+                  type: string
+        english:
+          type: object
+          properties:
+            test_type:
+              type: string
+              enum: [IELTS, PTE, TOEFL, OET, Cambridge, NA]
+            overall:
+              type: number
+            listening:
+              type: number
+            reading:
+              type: number
+            writing:
+              type: number
+            speaking:
+              type: number
+            test_date:
+              type: string
+              format: date
+        education:
+          type: array
+          items:
+            type: object
+            properties:
+              level:
+                type: string
+                enum: [bachelor, master, phd, diploma, other]
+              field:
+                type: string
+              country:
+                type: string
+              completed_date:
+                type: string
+                format: date
+        employment:
+          type: array
+          items:
+            type: object
+            properties:
+              employer:
+                type: string
+              country:
+                type: string
+              start_date:
+                type: string
+                format: date
+              end_date:
+                type: string
+                format: date
+                nullable: true
+              hours_per_week:
+                type: number
+              employment_type:
+                type: string
+                enum: [full_time, part_time, contract]
+              role_title:
+                type: string
+              duties_alignment:
+                type: string
+                enum: [high, medium, low, unknown]
+              evidence_strength:
+                type: string
+                enum: [strong, medium, weak, unknown]
+        points_claim:
+          type: object
+          properties:
+            total_points_claimed:
+              type: number
+            age_points:
+              type: number
+            english_points:
+              type: number
+            education_points:
+              type: number
+            australian_experience_points:
+              type: number
+            overseas_experience_points:
+              type: number
+            partner_points:
+              type: number
+            naati_points:
+              type: number
+            professional_year_points:
+              type: number
+            regional_study_points:
+              type: number
+            state_nomination_points:
+              type: number
+        state_nomination:
+          type: object
+          properties:
+            seeking_nomination:
+              type: boolean
+            state:
+              type: string
+            occupation_list_status:
+              type: string
+              enum: [unknown, on_list, off_list]
+            notes:
+              type: string
+        documents:
+          type: object
+          properties:
+            passport:
+              type: boolean
+            skills_assessment:
+              type: boolean
+            english_test:
+              type: boolean
+            employment_reference_letters:
+              type: boolean
+            employment_contracts:
+              type: boolean
+            payslips:
+              type: boolean
+            bank_statements:
+              type: boolean
+            cv:
+              type: boolean
+    Assessment:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        tenant_id:
+          type: string
+          format: uuid
+        profile_id:
+          type: string
+          format: uuid
+        policy_snapshot_id:
+          type: string
+        status:
+          type: string
+          enum: [pending, completed, failed]
+        created_at:
+          type: string
+          format: date-time
+        completed_at:
+          type: string
+          format: date-time
+          nullable: true
+  responses:
+    ValidationError:
+      description: Validation failed
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+                example: Content validation failed
+              violations:
+                type: array
+                items:
+                  type: string
+                example: ["Advice language detected: guarantee"]
+    Unauthorized:
+      description: Unauthorized
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+                example: API key required
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+                example: Assessment not found
