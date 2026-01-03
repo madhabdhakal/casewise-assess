@@ -3,7 +3,7 @@ import { ApplicantProfile } from '../domain/types';
 export class RuleEvaluators {
   
   static age_between(profile: ApplicantProfile, params: { min: number; max: number }): boolean {
-    const age = this.calculateAge(profile.data.person.date_of_birth);
+    const age = RuleEvaluators.calculateAge(profile.data.person.date_of_birth);
     return age >= params.min && age < params.max;
   }
   
@@ -26,7 +26,7 @@ export class RuleEvaluators {
       'superior': { IELTS: 8.0, PTE: 79, TOEFL: 94 }
     };
     
-    const threshold = thresholds[params.level]?.[english.test_type];
+    const threshold = thresholds[params.level as keyof typeof thresholds]?.[english.test_type as keyof typeof thresholds['competent']];
     if (!threshold) return false;
     
     return english.listening >= threshold && 

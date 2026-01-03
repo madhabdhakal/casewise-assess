@@ -1,1 +1,69 @@
-import { EligibilityEvaluator } from '../domain/eligibility/evaluator';\nimport { RiskAnalyzer } from '../domain/risk/analyzer';\nimport { ApplicantProfile } from '../domain/types';\nimport { PolicyManager } from '../domain/policy/manager';\n\ndescribe('EligibilityEvaluator', () => {\n  const mockProfile: ApplicantProfile = {\n    id: 'test-profile',\n    tenant_id: 'test-tenant',\n    profile_version: 1,\n    collected_at: '2024-01-01T00:00:00Z',\n    data: {\n      person: {\n        date_of_birth: '1992-03-15',\n        nationality: 'IND',\n        marital_status: 'married'\n      },\n      location: {\n        current_country: 'AUS',\n        current_state: 'NSW',\n        regional_postcode: '2000'\n      },\n      visa_history: {\n        current_visa_subclass: '485',\n        visa_expiry_date: '2025-06-30',\n        previous_refusals: false,\n        previous_cancellations: false,\n        compliance_issues: false,\n        notes: ''\n      },\n      occupation: {\n        anzsco_code: '261313',\n        occupation_title: 'Software Engineer',\n        skills_assessment: {\n          status: 'positive',\n          assessing_authority: 'ACS',\n          issue_date: '2024-06-15',\n          expiry_date: '2026-06-15',\n          notes: ''\n        }\n      },\n      english: {\n        test_type: 'IELTS',\n        overall: 7.0,\n        listening: 7.0,\n        reading: 7.0,\n        writing: 6.5,\n        speaking: 7.0,\n        test_date: '2024-06-15'\n      },\n      education: [],\n      employment: [],\n      points_claim: {\n        total_points_claimed: 70,\n        age_points: 25,\n        english_points: 10,\n        education_points: 15,\n        australian_experience_points: 5,\n        overseas_experience_points: 10,\n        partner_points: 5,\n        naati_points: 0,\n        professional_year_points: 0,\n        regional_study_points: 0,\n        state_nomination_points: 0\n      },\n      state_nomination: {\n        seeking_nomination: false,\n        state: '',\n        occupation_list_status: 'unknown',\n        notes: ''\n      },\n      documents: {\n        passport: true,\n        skills_assessment: true,\n        english_test: true,\n        employment_reference_letters: true,\n        employment_contracts: true,\n        payslips: true,\n        bank_statements: false,\n        cv: true\n      }\n    },\n    created_at: new Date()\n  };\n\n  describe('evaluate189', () => {\n    it('should return eligible for valid profile', () => {\n      const ruleset = PolicyManager.create189Ruleset('au-2026-01-01');\n      const result = EligibilityEvaluator.evaluate(mockProfile, ruleset);\n      \n      expect(result.eligibility_status).toBe('Eligible');\n      expect(result.points_score).toBe(70);\n      expect(result.missing_criteria).toHaveLength(0);\n    });\n\n    it('should return not eligible for age over limit', () => {\n      const overAgeProfile = {\n        ...mockProfile,\n        data: {\n          ...mockProfile.data,\n          person: {\n            ...mockProfile.data.person,\n            date_of_birth: '1970-01-01' // Age 54\n          }\n        }\n      };\n\n      const ruleset = PolicyManager.create189Ruleset('au-2026-01-01');\n      const result = EligibilityEvaluator.evaluate(overAgeProfile, ruleset);\n      \n      expect(result.eligibility_status).toBe('NotEligible');\n      expect(result.missing_criteria).toContain('AGE_RANGE');\n    });\n\n    it('should return not eligible for insufficient points', () => {\n      const lowPointsProfile = {\n        ...mockProfile,\n        data: {\n          ...mockProfile.data,\n          points_claim: {\n            ...mockProfile.data.points_claim,\n            total_points_claimed: 60\n          }\n        }\n      };\n\n      const ruleset = PolicyManager.create189Ruleset('au-2026-01-01');\n      const result = EligibilityEvaluator.evaluate(lowPointsProfile, ruleset);\n      \n      expect(result.eligibility_status).toBe('NotEligible');\n      expect(result.missing_criteria).toContain('POINTS_MINIMUM');\n    });\n  });\n\n  describe('evaluate190', () => {\n    it('should accept lower points threshold', () => {\n      const lowerPointsProfile = {\n        ...mockProfile,\n        data: {\n          ...mockProfile.data,\n          points_claim: {\n            ...mockProfile.data.points_claim,\n            total_points_claimed: 62\n          }\n        }\n      };\n\n      const ruleset = PolicyManager.create190Ruleset('au-2026-01-01');\n      const result = EligibilityEvaluator.evaluate(lowerPointsProfile, ruleset);\n      \n      expect(result.eligibility_status).toBe('Eligible');\n      expect(result.points_score).toBe(62);\n    });\n  });\n});\n\ndescribe('RiskAnalyzer', () => {\n  const baseProfile: ApplicantProfile = {\n    id: 'test-profile',\n    tenant_id: 'test-tenant',\n    profile_version: 1,\n    collected_at: '2024-01-01T00:00:00Z',\n    data: {\n      person: {\n        date_of_birth: '1992-03-15',\n        nationality: 'IND',\n        marital_status: 'married'\n      },\n      location: {\n        current_country: 'AUS',\n        current_state: 'NSW',\n        regional_postcode: '2000'\n      },\n      visa_history: {\n        current_visa_subclass: '485',\n        visa_expiry_date: '2025-06-30',\n        previous_refusals: false,\n        previous_cancellations: false,\n        compliance_issues: false,\n        notes: ''\n      },\n      occupation: {\n        anzsco_code: '261313',\n        occupation_title: 'Software Engineer',\n        skills_assessment: {\n          status: 'positive',\n          assessing_authority: 'ACS',\n          issue_date: '2024-06-15',\n          expiry_date: '2026-06-15',\n          notes: ''\n        }\n      },\n      english: {\n        test_type: 'IELTS',\n        overall: 7.0,\n        listening: 7.0,\n        reading: 7.0,\n        writing: 6.5,\n        speaking: 7.0,\n        test_date: '2024-06-15'\n      },\n      education: [],\n      employment: [],\n      points_claim: {\n        total_points_claimed: 70,\n        age_points: 25,\n        english_points: 10,\n        education_points: 15,\n        australian_experience_points: 5,\n        overseas_experience_points: 10,\n        partner_points: 5,\n        naati_points: 0,\n        professional_year_points: 0,\n        regional_study_points: 0,\n        state_nomination_points: 0\n      },\n      state_nomination: {\n        seeking_nomination: false,\n        state: '',\n        occupation_list_status: 'unknown',\n        notes: ''\n      },\n      documents: {\n        passport: true,\n        skills_assessment: true,\n        english_test: true,\n        employment_reference_letters: true,\n        employment_contracts: true,\n        payslips: true,\n        bank_statements: false,\n        cv: true\n      }\n    },\n    created_at: new Date()\n  };\n\n  describe('assess', () => {\n    it('should identify low points risk', () => {\n      const lowPointsProfile = {\n        ...baseProfile,\n        data: {\n          ...baseProfile.data,\n          points_claim: {\n            ...baseProfile.data.points_claim,\n            total_points_claimed: 65\n          }\n        }\n      };\n\n      const result = RiskAnalyzer.assess(lowPointsProfile);\n      \n      expect(result.risk_factors).toContainEqual(\n        expect.objectContaining({\n          code: 'POINTS_MARGIN_LOW',\n          level: 'Medium'\n        })\n      );\n    });\n\n    it('should identify age risk for applicants near limit', () => {\n      const nearAgeLimitProfile = {\n        ...baseProfile,\n        data: {\n          ...baseProfile.data,\n          person: {\n            ...baseProfile.data.person,\n            date_of_birth: '1981-01-01' // Age 43\n          }\n        }\n      };\n\n      const result = RiskAnalyzer.assess(nearAgeLimitProfile);\n      \n      expect(result.risk_factors).toContainEqual(\n        expect.objectContaining({\n          code: 'AGE_NEAR_THRESHOLD',\n          level: 'Medium'\n        })\n      );\n    });\n\n    it('should identify prior refusal risk', () => {\n      const refusalProfile = {\n        ...baseProfile,\n        data: {\n          ...baseProfile.data,\n          visa_history: {\n            ...baseProfile.data.visa_history,\n            previous_refusals: true\n          }\n        }\n      };\n\n      const result = RiskAnalyzer.assess(refusalProfile);\n      \n      expect(result.risk_factors).toContainEqual(\n        expect.objectContaining({\n          code: 'PRIOR_REFUSAL_FLAG',\n          level: 'High'\n        })\n      );\n    });\n\n    it('should calculate overall risk level correctly', () => {\n      const highRiskProfile = {\n        ...baseProfile,\n        data: {\n          ...baseProfile.data,\n          visa_history: {\n            ...baseProfile.data.visa_history,\n            previous_refusals: true\n          },\n          documents: {\n            ...baseProfile.data.documents,\n            passport: false\n          }\n        }\n      };\n\n      const result = RiskAnalyzer.assess(highRiskProfile);\n      \n      expect(result.risk_level).toBe('High');\n    });\n\n    it('should return low risk for compliant profile', () => {\n      const result = RiskAnalyzer.assess(baseProfile);\n      \n      expect(result.risk_level).toBe('Low');\n      expect(result.mitigating_factors).toContain('Positive skills assessment held');\n    });\n  });\n});
+import { RuleEvaluators } from '../services/rule-evaluators';
+import { cloneProfile } from '../test-utils/fixtures';
+
+describe('RuleEvaluators', () => {
+  beforeAll(() => {
+    jest.useFakeTimers();
+    jest.setSystemTime(new Date('2025-01-01T00:00:00.000Z'));
+  });
+
+  afterAll(() => {
+    jest.useRealTimers();
+  });
+
+  it('validates age ranges correctly', () => {
+    const withinRange = cloneProfile();
+    const overAge = cloneProfile({
+      data: {
+        person: {
+          date_of_birth: '1970-01-01'
+        }
+      }
+    });
+
+    expect(RuleEvaluators.age_between(withinRange, { min: 18, max: 45 })).toBe(true);
+    expect(RuleEvaluators.age_between(overAge, { min: 18, max: 45 })).toBe(false);
+  });
+
+  it('checks skills assessment validity and expiry', () => {
+    const validSkills = cloneProfile();
+    const expiredSkills = cloneProfile({
+      data: {
+        occupation: {
+          skills_assessment: {
+            status: 'positive',
+            expiry_date: '2024-01-01'
+          }
+        }
+      }
+    });
+
+    expect(RuleEvaluators.skills_assessment_positive_and_not_expired(validSkills, {})).toBe(true);
+    expect(RuleEvaluators.skills_assessment_positive_and_not_expired(expiredSkills, {})).toBe(false);
+  });
+
+  it('applies English thresholds by level', () => {
+    const competentProfile = cloneProfile();
+    const insufficientProfile = cloneProfile({
+      data: {
+        english: {
+          listening: 5.5,
+          reading: 5.5,
+          writing: 5.5,
+          speaking: 5.5,
+          overall: 5.5
+        }
+      }
+    });
+
+    expect(RuleEvaluators.english_minimum(competentProfile, { level: 'competent' })).toBe(true);
+    expect(RuleEvaluators.english_minimum(insufficientProfile, { level: 'competent' })).toBe(false);
+  });
+
+  it('checks claimed points thresholds', () => {
+    const profile = cloneProfile();
+
+    expect(RuleEvaluators.points_at_least(profile, { minimum: 65 })).toBe(true);
+    expect(RuleEvaluators.points_at_least(profile, { minimum: 90 })).toBe(false);
+  });
+});

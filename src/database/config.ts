@@ -1,39 +1,49 @@
-import { Pool, PoolConfig } from 'pg';
+import sql from 'mssql';
 
-const config: PoolConfig = {
-  host: process.env.DB_HOST || 'localhost',
-  port: parseInt(process.env.DB_PORT || '5432'),
-  database: process.env.DB_NAME || 'casewise_assess',
-  user: process.env.DB_USER || 'postgres',
-  password: process.env.DB_PASSWORD || 'password',
-  max: 20,
-  idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 2000,
-};
+const defaultConnectionString =
+  process.env.DB_CONNECTION_STRING ||
+  "Server=49.176.252.202,1433;Database=casewise-assess;User Id=casewiseDbUser;Password='casewiseDb@2026!';TrustServerCertificate=True;MultipleActiveResultSets=true;Encrypt=False";
 
-export const pool = new Pool(config);
+const poolPromise = new sql.ConnectionPool({ connectionString: defaultConnectionString }).connect();
 
-export async function query(text: string, params?: any[]) {
-  const client = await pool.connect();
-  try {
-    const result = await client.query(text, params);
-    return result;
-  } finally {
-    client.release();
-  }
+function normalizeQuery(text: string): string {
+  return text.replace(/\$(\d+)/g, (_, index) => `@p${index}`);
 }
 
-export async function transaction<T>(callback: (client: any) => Promise<T>): Promise<T> {
-  const client = await pool.connect();
+async function executeQuery(pool: sql.ConnectionPool | sql.Transaction, text: string, params: any[] = []) {
+  const request = pool.request();
+  params.forEach((value, idx) => {
+    request.input(`p${idx + 1}`, value);
+  });
+
+  const formatted = normalizeQuery(text);
+  const result = await request.query(formatted);
+  return {
+    rows: result.recordset,
+    rowCount: result.rowsAffected?.[0] ?? result.recordset.length,
+  };
+}
+
+export async function query(text: string, params: any[] = []) {
+  const pool = await poolPromise;
+  return executeQuery(pool, text, params);
+}
+
+export async function transaction<T>(callback: (client: { query: typeof query }) => Promise<T>): Promise<T> {
+  const pool = await poolPromise;
+  const tx = new sql.Transaction(pool);
+
+  await tx.begin();
+  const transactionalClient = {
+    query: (text: string, params: any[] = []) => executeQuery(tx, text, params),
+  };
+
   try {
-    await client.query('BEGIN');
-    const result = await callback(client);
-    await client.query('COMMIT');
+    const result = await callback(transactionalClient);
+    await tx.commit();
     return result;
   } catch (error) {
-    await client.query('ROLLBACK');
+    await tx.rollback();
     throw error;
-  } finally {
-    client.release();
   }
 }
